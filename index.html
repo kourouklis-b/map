@@ -1,3 +1,11 @@
+<script>
+  const password = prompt("Δώσε κωδικό πρόσβασης:");
+
+  if (password !== "edymet1234") {
+    document.body.innerHTML = "<h1>Δεν επιτρέπεται η πρόσβαση</h1>";
+    throw new Error("Unauthorized");
+  }
+</script>
 <!DOCTYPE html>
 <html lang="el">
 <head>
