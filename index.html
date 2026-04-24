@@ -1,10 +1,15 @@
 <script>
-  const password = prompt("Δώσε κωδικό πρόσβασης:");
+    function checkPassword() {
+        const password = document.getElementById("password").value;
+        const correctPassword = "edymet1234"; // Ο κωδικός έχει οριστεί εδώ
 
-  if (password !== "edymet1234") {
-    document.body.innerHTML = "<h1>Δεν επιτρέπεται η πρόσβαση</h1>";
-    throw new Error("Unauthorized");
-  }
+        if (password === correctPassword) {
+            document.getElementById("login-form").style.display = "none";
+            document.getElementById("secret-content").style.display = "block";
+        } else {
+            document.getElementById("error-msg").innerText = "Λάθος κωδικός! Προσπαθήστε ξανά.";
+        }
+    }
 </script>
 <!DOCTYPE html>
 <html lang="el">
