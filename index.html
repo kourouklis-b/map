@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+<title>ΕΔΥΜΕΤ – Χάρτης Σιδηροδρομικών Έργων</title>
+<link rel="stylesheet" href="./resources/ol.css">
+<link rel="stylesheet" href="resources/fontawesome-all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ─── ROOT VARIABLES ─── */
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #21262d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --col-ep:  #388bfd;
+  --col-met: #3fb950;
+  --col-c14: #e3a008;
+  --col-c21: #c084fc;
+  --col-unk: #8b949e;
+  --hdr:     52px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ─── HEADER ─── */
+header {
+  height: var(--hdr);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 18px;
+  flex-shrink: 0;
+  position: relative; z-index: 2000;
+}
+.logo {
+  width: 54px; height: 34px; border-radius: 6px;
+  background: var(--col-ep);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 600; color: #fff;
+  flex-shrink: 0; letter-spacing: -0.5px;
+}
+.htxt h1 { font-size: 14px; font-weight: 700; }
+.htxt p  { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+.legend { margin-left: auto; display: flex; gap: 5px; flex-wrap: wrap; }
+.lbtn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 5px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--muted); font-family: inherit; font-size: 11px; cursor: pointer;
+  transition: all .15s;
+}
+.lbtn:hover, .lbtn.on { color: var(--text); background: var(--border); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── LAYOUT ─── */
+.wrap { display: flex; height: calc(100% - var(--hdr)); }
+#map  { flex: 1; height: 100%; position: relative; }
+
+/* ─── OL OVERRIDES ─── */
+.ol-control > * {
+  background-color: #1e2530 !important;
+  color: #c9d1d9 !important;
+  border-radius: 4px !important;
+}
+.ol-control > *:hover, .ol-control > *:focus {
+  background-color: rgba(56,139,253,.25) !important;
+}
+.ol-control { background-color: transparent !important; padding: 2px !important; }
+.ol-attribution {
+  background: rgba(13,17,23,.85) !important;
+  color: var(--muted) !important;
+  font-size: 9px !important;
+}
+.ol-attribution a { color: var(--muted) !important; }
+
+/* ─── OL POPUP WRAPPER ─── */
+.ol-popup {
+  position: absolute;
+  background-color: #ffffff;
+  box-shadow: 0 8px 36px rgba(0,0,0,.25);
+  border-radius: 10px;
+  border: 1px solid #d0d7de;
+  padding: 0;
+  min-width: 380px;
+  max-width: 420px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  display: none;
+  z-index: 1500;
+  transform: translate(-50%, -110%);
+}
+.ol-popup::after {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 10px solid transparent;
+  border-top-color: white;
+}
+.ol-popup::before {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  transform: translateX(-50%);
+  border: 11px solid transparent;
+  border-top-color: #d0d7de;
+  margin-top: 1px;
+}
+.ol-popup-closer {
+  text-decoration: none;
+  position: absolute;
+  top: 9px; right: 12px;
+  color: #999; font-size: 16px; font-weight: 700;
+  line-height: 1; z-index: 10;
+}
+.ol-popup-closer::after { content: '✕'; }
+.ol-popup-closer:hover { color: #111; }
+
+/* ─── POPUP CARD CONTENT ─── */
+.pi {
+  padding: 16px 18px 18px;
+  max-height: 68vh;
+  overflow-y: auto;
+  color: #1a1a2e;
+}
+.pi::-webkit-scrollbar { width: 3px; }
+.pi::-webkit-scrollbar-thumb { background: #d0d7de; border-radius: 2px; }
+
+.pi-aa    { font: 500 9px/1 'IBM Plex Mono', monospace; color: #666; margin-bottom: 4px; }
+.pi-title { font-size: 13px; font-weight: 700; line-height: 1.4; padding-right: 22px; color: #111827; }
+.pi-tag   { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px; margin-top: 8px; }
+.t-ep  { background: rgba(56,139,253,.12);  color: #1a6fd4; }
+.t-met { background: rgba(22,163,74,.12);   color: #166534; }
+.t-c14 { background: rgba(180,120,0,.12);   color: #92400e; }
+.t-c21 { background: rgba(126,58,242,.12);  color: #5b21b6; }
+.t-unk { background: rgba(139,148,158,.12); color: #555; }
+
+.pi hr { border: none; border-top: 1px solid #e5e7eb; margin: 12px 0; }
+.pi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.pi-f { background: #f6f8fa; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; }
+.pi-f.full { grid-column: 1/-1; }
+.pi-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .09em; color: #6b7280; font-weight: 600; margin-bottom: 3px; }
+.pi-val { font-size: 11px; line-height: 1.45; color: #111827; }
+.pi-val.mono { font-family: 'IBM Plex Mono', monospace; color: #1a6fd4; font-size: 10px; }
+.pbar { height: 5px; background: #e5e7eb; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+.pfill { height: 100%; border-radius: 3px; }
+.crit-hd { font-size: 9px; text-transform: uppercase; letter-spacing: .09em; color: #6b7280; font-weight: 600; margin: 12px 0 6px; }
+.crit { font-size: 11px; padding: 6px 10px; margin-bottom: 5px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 5px; line-height: 1.4; color: #431407; }
+.crit::before { content: '⚠ '; color: #ea580c; }
+
+/* Cluster chooser */
+.cluster-list { padding: 14px 16px 12px; }
+.cluster-list h3 { font-size: 10px; font-weight: 700; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.cluster-item {
+  padding: 7px 10px; border-radius: 6px; margin-bottom: 5px;
+  border: 1px solid #e5e7eb; cursor: pointer;
+  display: flex; align-items: flex-start; gap: 8px; transition: background .12s;
+}
+.cluster-item:hover { background: #f0f6ff; border-color: #bfdbfe; }
+.cluster-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
+.cluster-title { font-size: 11px; font-weight: 500; color: #111; line-height: 1.35; }
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  width: 295px; background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+}
+.sb-hdr {
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+  font-size: 9px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .09em; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.badge {
+  background: var(--border); border-radius: 10px;
+  padding: 2px 8px; font: 600 10px/1 'IBM Plex Mono', monospace; color: var(--text);
+}
+.plist { overflow-y: auto; flex: 1; }
+.plist::-webkit-scrollbar { width: 3px; }
+.plist::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.pitem {
+  padding: 9px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; display: flex; gap: 9px; align-items: flex-start;
+  border-left: 3px solid transparent; transition: background .12s;
+}
+.pitem:hover { background: rgba(255,255,255,.04); }
+.pitem.on { background: rgba(56,139,253,.07); border-left-color: var(--col-ep); }
+.pnum { font: 500 9px/1.2 'IBM Plex Mono', monospace; color: var(--muted); min-width: 18px; padding-top: 2px; }
+.ptitle { font-size: 10.5px; font-weight: 500; line-height: 1.4; }
+.pmeta { display: flex; gap: 5px; margin-top: 4px; align-items: center; }
+.ppill { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; }
+.p-ep  { background: rgba(56,139,253,.15);  color: #388bfd; }
+.p-met { background: rgba(63,185,80,.15);   color: #3fb950; }
+.p-c14 { background: rgba(227,160,8,.15);   color: #c78a00; }
+.p-c21 { background: rgba(192,132,252,.15); color: #c084fc; }
+.p-unk { background: rgba(139,148,158,.15); color: #8b949e; }
+
+/* Rail legend */
+#rail-legend {
+  position: absolute; bottom: 28px; left: 8px;
+  background: rgba(22,27,34,.93); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 13px;
+  font-size: 10px; z-index: 900; color: var(--text); line-height: 2;
+  pointer-events: none;
+}
+.rl-title { font-weight: 700; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.rl-row { display: flex; align-items: center; gap: 7px; }
+.rl-line { display: inline-block; width: 22px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.rl-dash { display: inline-block; width: 22px; border-top: 3px dashed #e67e22; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header>
+  <div class="logo">ΕΔΥΜΕΤ</div>
+  <div class="htxt">
+    <h1>Σιδηροδρομικά Έργα</h1>
+    <p>Διαδραστικός Χάρτης Παρακολούθησης · Απρίλιος 2026</p>
+  </div>
+  <div class="legend">
+    <button class="lbtn on"  onclick="flt('all',this)"><div class="dot" style="background:#8b949e"></div>Όλα</button>
+    <button class="lbtn"     onclick="flt('EP',this)"><div class="dot" style="background:#388bfd"></div>ΕΠ ΥΜΕΠΕΡΑΑ</button>
+    <button class="lbtn"     onclick="flt('MET',this)"><div class="dot" style="background:#3fb950"></div>ΜΕΤΑΦΟΡΕΣ</button>
+    <button class="lbtn"     onclick="flt('CEF14',this)"><div class="dot" style="background:#e3a008"></div>CEF 2014-20</button>
+    <button class="lbtn"     onclick="flt('CEF21',this)"><div class="dot" style="background:#c084fc"></div>CEF 2021-27</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- MAP -->
+  <div id="map">
+    <div id="popup" class="ol-popup">
+      <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+      <div id="popup-content"></div>
+    </div>
+    <div id="rail-legend">
+      <div class="rl-title">Σιδηροδρομικό Δίκτυο</div>
+      <div class="rl-row"><span class="rl-line" style="background:#c0392b"></span>Κεντρικό (Core)</div>
+      <div class="rl-row"><span class="rl-line" style="background:#2471a3"></span>Εκτεταμένο</div>
+      <div class="rl-row"><span class="rl-dash"></span>Υπό κατασκευή</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-hdr">Κατάλογος Έργων <span class="badge" id="cnt">—</span></div>
+    <div class="plist" id="plist"></div>
+  </div>
+</div>
+
+<!-- ─── EXTERNAL SCRIPTS ─── -->
+<script src="./resources/ol.js"></script>
+<script src="./resources/functions.js"></script>
+<script src="./resources/Autolinker.min.js"></script>
+
+<!-- GeoJSON data -->
+<script src="./layers/railway_rail_GREECE_1.js"></script>
+<script src="./layers/railway_2.js"></script>
+<script src="./layers/ERGA_3.js"></script>
+
+<!-- Railway styles (ERGA style is defined inline) -->
+<script src="./styles/railway_rail_GREECE_1_style.js"></script>
+<script src="./styles/railway_2_style.js"></script>
+
+<!-- ─── MAIN APP ─── -->
+<script>
+'use strict';
+
+/* ── Program classification ── */
+const PROG_COLORS = { EP:'#388bfd', MET:'#3fb950', CEF14:'#e3a008', CEF21:'#c084fc', OTHER:'#8b949e' };
+const PROG_LABELS = { EP:'ΕΠ ΥΜΕΠΕΡΑΑ', MET:'ΜΕΤΑΦΟΡΕΣ', CEF14:'CEF 2014-20', CEF21:'CEF 2021-27', OTHER:'Άλλο' };
+const PROG_TAG    = { EP:'t-ep', MET:'t-met', CEF14:'t-c14', CEF21:'t-c21', OTHER:'t-unk' };
+const PROG_PILL   = { EP:'p-ep', MET:'p-met', CEF14:'p-c14', CEF21:'p-c21', OTHER:'p-unk' };
+
+function getProg(fundProg) {
+  if (!fundProg) return 'OTHER';
+  if (fundProg.includes('ΥΜΕΠΕΡΑΑ')) return 'EP';
+  if (fundProg.includes('CEF 2014') || fundProg.includes('CEF2014')) return 'CEF14';
+  if (fundProg.includes('CEF 2021') || fundProg.includes('CEF2021')) return 'CEF21';
+  if (fundProg.includes('ΜΕΤΑΦΟΡΕΣ') || fundProg.includes('Π-ΜΕΤ')) return 'MET';
+  return 'OTHER';
+}
+
+/* ── Active filter ── */
+var activeFilter = 'all';
+var styleCache = {};
+
+/* ── Canvas marker factory ── */
+function makeMarker(color, label, r) {
+  r = r || 16;
+  var sz = (r + 5) * 2;
+  var canvas = document.createElement('canvas');
+  canvas.width = sz; canvas.height = sz;
+  var ctx = canvas.getContext('2d');
+  var cx = sz / 2, cy = sz / 2;
+  // Glow ring
+  ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, 2*Math.PI);
+  ctx.fillStyle = color + '2a'; ctx.fill();
+  // Circle
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2*Math.PI);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+  // Label text
+  ctx.fillStyle = '#fff';
+  var fs = Math.max(8, Math.round(r * 0.58));
+  ctx.font = 'bold ' + fs + 'px "IBM Plex Mono",monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, cx, cy + 0.5);
+  return new ol.style.Style({
+    image: new ol.style.Icon({ img: canvas, imgSize: [sz, sz], anchor: [0.5, 0.5] })
+  });
+}
+
+/* ── ERGA style function ── */
+function style_ERGA(feature) {
+  var clustered = feature.get('features');
+  if (!clustered || clustered.length === 0) return null;
+
+  // Determine visible features based on filter
+  var visible = activeFilter === 'all'
+    ? clustered
+    : clustered.filter(function(f) { return getProg(f.get('fund_prog')) === activeFilter; });
+  if (visible.length === 0) return new ol.style.Style({}); // invisible
+
+  if (visible.length === 1) {
+    var f = visible[0];
+    var prog = getProg(f.get('fund_prog'));
+    var id = String(f.get('id') || '•');
+    var key = 'S-' + prog + '-' + id;
+    if (!styleCache[key]) styleCache[key] = makeMarker(PROG_COLORS[prog], id, 16);
+    return styleCache[key];
+  } else {
+    var key2 = 'C-' + visible.length;
+    if (!styleCache[key2]) {
+      var r2 = Math.min(Math.round(8 + Math.log(visible.length + 1) * 4), 22);
+      styleCache[key2] = makeMarker('#f97316', String(visible.length), r2);
+    }
+    return styleCache[key2];
+  }
+}
+
+/* ── Build OL layers ── */
+// Base
+var lyr_base = new ol.layer.Tile({
+  source: new ol.source.XYZ({ attributions: ' ', url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}' })
+});
+
+// Railway core
+var src_r1 = new ol.source.Vector({ attributions: ' ' });
+src_r1.addFeatures(new ol.format.GeoJSON().readFeatures(json_railway_rail_GREECE_1, { dataProjection:'EPSG:4326', featureProjection:'EPSG:3857' }));
+var lyr_r1 = new ol.layer.Vector({ source: src_r1, style: style_railway_rail_GREECE_1 });
+
+// Railway alt
+var src_r2 = new ol.source.Vector({ attributions: ' ' });
+src_r2.addFeatures(new ol.format.GeoJSON().readFeatures(json_railway_2, { dataProjection:'EPSG:4326', featureProjection:'EPSG:3857' }));
+var lyr_r2 = new ol.layer.Vector({ source: src_r2, style: style_railway_2, visible: false });
+
+// ERGA project markers
+var src_erga = new ol.source.Vector({ attributions: ' ' });
+src_erga.addFeatures(new ol.format.GeoJSON().readFeatures(json_ERGA_3, { dataProjection:'EPSG:4326', featureProjection:'EPSG:3857' }));
+var cluster_erga = new ol.source.Cluster({ distance: 40, source: src_erga });
+var lyr_erga = new ol.layer.Vector({ source: cluster_erga, style: style_ERGA, interactive: true });
+
+/* ── Map init ── */
+var map = new ol.Map({
+  target: 'map',
+  renderer: 'canvas',
+  layers: [lyr_base, lyr_r1, lyr_r2, lyr_erga],
+  controls: ol.control.defaults.defaults({ attribution: true }),
+  view: new ol.View({ maxZoom: 18, minZoom: 4 })
+});
+map.getView().fit([1930846, 4406148, 2957430, 4975163], map.getSize());
+
+// Pointer cursor
+map.on('pointermove', function(evt) {
+  if (evt.dragging) return;
+  var hit = map.hasFeatureAtPixel(evt.pixel, { layerFilter: function(l) { return l === lyr_erga; } });
+  map.getViewport().style.cursor = hit ? 'pointer' : '';
+});
+
+/* ── Popup setup ── */
+var popupEl      = document.getElementById('popup');
+var popupContent = document.getElementById('popup-content');
+var popupCloser  = document.getElementById('popup-closer');
+
+var overlay = new ol.Overlay({ element: popupEl, autoPan: { animation: { duration: 250 } } });
+map.addOverlay(overlay);
+
+popupCloser.onclick = function() {
+  closePopup();
+  return false;
+};
+
+function closePopup() {
+  overlay.setPosition(undefined);
+  popupEl.style.display = 'none';
+  document.querySelectorAll('.pitem').forEach(function(e) { e.classList.remove('on'); });
+}
+
+function openPopup(coord) {
+  popupEl.style.display = 'block';
+  overlay.setPosition(coord);
+}
+
+/* ── Popup HTML builder ── */
+function buildPopupHtml(props) {
+  var prog    = getProg(props['fund_prog']);
+  var color   = PROG_COLORS[prog];
+  var tagCls  = PROG_TAG[prog];
+  var progLbl = (props['fund_prog'] && props['fund_prog'] !== 'null') ? props['fund_prog'].trim() : PROG_LABELS[prog];
+  var id      = props['id'] || '—';
+  var mis     = (props['mis_code'] && props['mis_code'] !== 'null') ? props['mis_code'] : null;
+  var title   = props['title'] ? props['title'].trim() : 'Χωρίς τίτλο';
+  var descr   = props['descr/tion'] ? props['descr/tion'].trim() : '';
+  var budget  = props['budg_fund'] || '—';
+  var conAmt  = props['contract_a'] || '—';
+  var contr   = props['contractor'] ? props['contractor'].trim() : '—';
+  var signDt  = props['sign_date'] ? props['sign_date'].trim() : '—';
+  var deadln  = props['deadline'] ? props['deadline'].trim() : '—';
+  var status  = props['status'] ? props['status'].trim() : '—';
+  var critStr = props['critical_i'] || '';
+
+  // Progress extraction
+  var progress = null;
+  var pMatch = status.match(/([\d]+[,\.][\d]+)%/);
+  if (pMatch) progress = parseFloat(pMatch[1].replace(',','.'));
+
+  var progHtml = progress !== null
+    ? '<div class="pi-f full"><div class="pi-lbl">Πρόοδος Υλοποίησης</div><div class="pi-val">' + status + '</div><div class="pbar"><div class="pfill" style="width:' + Math.min(progress,100) + '%;background:linear-gradient(90deg,' + color + ',#34d399)"></div></div></div>'
+    : '<div class="pi-f full"><div class="pi-lbl">Κατάσταση</div><div class="pi-val">' + status + '</div></div>';
+
+  var critItems = critStr.split(/[\n;]/).map(function(s){ return s.trim(); }).filter(Boolean);
+  var critHtml = critItems.length ? '<div class="crit-hd">Κρίσιμα Θέματα & Ενέργειες</div>' + critItems.map(function(c){ return '<div class="crit">' + c + '</div>'; }).join('') : '';
+
+  var descrHtml = descr ? '<div class="pi-f full" style="border-color:' + color + '44;margin-bottom:8px"><div class="pi-lbl">Αντικείμενο</div><div class="pi-val">' + descr + '</div></div>' : '';
+
+  return '<div class="pi">'
+    + '<div class="pi-aa">α/α-' + id + (mis ? ' · MIS: ' + mis : '') + '</div>'
+    + '<div class="pi-title">' + title + '</div>'
+    + '<span class="pi-tag ' + tagCls + '">' + progLbl + '</span>'
+    + '<hr>'
+    + descrHtml
+    + '<div class="pi-grid">'
+    +   '<div class="pi-f"><div class="pi-lbl">Χρηματοδότηση Έργου</div><div class="pi-val mono">' + budget + '</div></div>'
+    +   '<div class="pi-f"><div class="pi-lbl">Ποσό Σύμβασης</div><div class="pi-val mono">' + conAmt + '</div></div>'
+    +   '<div class="pi-f full"><div class="pi-lbl">Ανάδοχος</div><div class="pi-val">' + contr + '</div></div>'
+    +   '<div class="pi-f"><div class="pi-lbl">Υπογραφή Σύμβασης</div><div class="pi-val">' + signDt + '</div></div>'
+    +   '<div class="pi-f"><div class="pi-lbl">Προθεσμία Περαίωσης</div><div class="pi-val">' + deadln + '</div></div>'
+    +   progHtml
+    + '</div>'
+    + critHtml
+    + '</div>';
+}
+
+/* ── Click handler ── */
+map.on('singleclick', function(evt) {
+  var coord = evt.coordinate;
+  var clicked = [];
+
+  map.forEachFeatureAtPixel(evt.pixel, function(feature, layer) {
+    if (layer !== lyr_erga) return;
+    var clist = feature.get('features');
+    if (!clist) return;
+    var visible = activeFilter === 'all' ? clist : clist.filter(function(f){ return getProg(f.get('fund_prog')) === activeFilter; });
+    clicked = clicked.concat(visible);
+  });
+
+  if (clicked.length === 0) { closePopup(); return; }
+
+  if (clicked.length === 1) {
+    var props = clicked[0].getProperties();
+    popupContent.innerHTML = buildPopupHtml(props);
+    openPopup(coord);
+    highlightSidebar(props['id']);
+  } else {
+    // Cluster picker
+    var items = clicked.map(function(f) {
+      var p = f.getProperties();
+      var pr = getProg(p['fund_prog']);
+      var t = (p['title'] || 'Χωρίς τίτλο').trim();
+      if (t.length > 75) t = t.substring(0,75) + '…';
+      return '<div class="cluster-item" onclick="pickFeature(\'' + p['id'] + '\', [' + coord + '])">'
+        + '<span class="cluster-dot" style="background:' + PROG_COLORS[pr] + '"></span>'
+        + '<span class="cluster-title">' + t + '</span></div>';
+    }).join('');
+    popupContent.innerHTML = '<div class="cluster-list"><h3>' + clicked.length + ' Έργα σε αυτή την περιοχή</h3>' + items + '</div>';
+    openPopup(coord);
+  }
+});
+
+// Pick individual feature from cluster list
+function pickFeature(id, coord) {
+  var features = src_erga.getFeatures();
+  for (var i = 0; i < features.length; i++) {
+    if (String(features[i].get('id')) === String(id)) {
+      var props = features[i].getProperties();
+      popupContent.innerHTML = buildPopupHtml(props);
+      highlightSidebar(id);
+      return;
+    }
+  }
+}
+
+/* ── Sidebar highlight ── */
+function highlightSidebar(id) {
+  document.querySelectorAll('.pitem').forEach(function(e){ e.classList.remove('on'); });
+  var el = document.querySelector('.pitem[data-id="' + id + '"]');
+  if (el) { el.classList.add('on'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+/* ── Sidebar rendering ── */
+function buildSidebar(filter) {
+  var list = document.getElementById('plist');
+  var cnt  = document.getElementById('cnt');
+  var all  = json_ERGA_3.features;
+  var data = filter === 'all' ? all : all.filter(function(f){ return getProg(f.properties['fund_prog']) === filter; });
+  cnt.textContent = data.length;
+  list.innerHTML = data.map(function(f) {
+    var p    = f.properties;
+    var prog = getProg(p['fund_prog']);
+    var col  = PROG_COLORS[prog];
+    var ttl  = (p['title'] || 'Χωρίς τίτλο').trim();
+    return '<div class="pitem" data-id="' + p['id'] + '" onclick="zoomToId(\'' + p['id'] + '\')">'
+      + '<div class="pnum" style="color:' + col + '">' + p['id'] + '</div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div class="ptitle">' + ttl + '</div>'
+      +   '<div class="pmeta"><span class="ppill ' + PROG_PILL[prog] + '">' + PROG_LABELS[prog] + '</span></div>'
+      + '</div></div>';
+  }).join('');
+}
+
+/* ── Zoom to feature from sidebar ── */
+function zoomToId(id) {
+  var features = src_erga.getFeatures();
+  var target = null;
+  for (var i = 0; i < features.length; i++) {
+    if (String(features[i].get('id')) === String(id)) { target = features[i]; break; }
+  }
+  if (!target) return;
+  var geom   = target.getGeometry();
+  var coords = geom.getCoordinates();
+  var curZ   = map.getView().getZoom();
+  map.getView().animate({ center: coords, zoom: Math.max(curZ, 10), duration: 600 });
+  setTimeout(function() {
+    var props = target.getProperties();
+    popupContent.innerHTML = buildPopupHtml(props);
+    openPopup(coords);
+    highlightSidebar(id);
+  }, 660);
+}
+
+/* ── Filter ── */
+function flt(prog, btn) {
+  activeFilter = prog;
+  styleCache = {};
+  lyr_erga.changed();
+  document.querySelectorAll('.lbtn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+  buildSidebar(prog);
+  closePopup();
+}
+
+/* ── Init ── */
+buildSidebar('all');
+</script>
+</body>
+</html>
