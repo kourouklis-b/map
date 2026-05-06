@@ -756,13 +756,19 @@ function doExportPDF(){
         var col = COL_MAP[cls]||'#6b7280';
         var pct = getPct(p.status);
         var prog = (p.fund_prog||'').replace(/Πρόγραμμα «|»/g,'').trim();
+        var statusTxt = (p.status||'—').trim().replace(/\n/g,'<br>');
+        var criticalItems = (p.critical_i||'').trim().split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+        var criticalHtml = criticalItems.length
+            ? criticalItems.map(function(item){ return '<span style="display:block;background:#fff7ed;border-left:3px solid #fb923c;padding:3px 6px;margin-bottom:3px;border-radius:0 4px 4px 0;font-size:10px">⚠ '+item+'</span>'; }).join('')
+            : '<span style="color:#94a3b8">—</span>';
         return '<tr>'+
             '<td style="text-align:center;font-weight:700;color:'+col+'">'+p.id+'</td>'+
             '<td style="font-weight:600">'+((p.title||'').trim())+'</td>'+
-            '<td><span style="background:'+col+'22;color:'+col+';border:1px solid '+col+'55;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap">'+prog+'</span></td>'+
+            '<td><span style="background:'+col+'22;color:'+col+';border:1px solid '+col+'55;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap">'+prog+'</span></td>'+
             '<td>'+(p.contractor||'—').trim()+'</td>'+
             '<td style="text-align:center">'+pctBadge(pct)+'</td>'+
-            '<td style="text-align:center;color:#475569">'+(p.deadline||'—').trim()+'</td>'+
+            '<td style="font-size:10px;color:#334155">'+statusTxt+'</td>'+
+            '<td style="font-size:10px">'+criticalHtml+'</td>'+
         '</tr>';
     }).join('');
 
@@ -810,12 +816,13 @@ function doExportPDF(){
     '</div>'+
     '<table>'+
         '<thead><tr>'+
-            '<th style="width:38px">Α/Α</th>'+
-            '<th style="width:30%">Τίτλος Έργου</th>'+
-            '<th style="width:130px">Πρόγραμμα</th>'+
-            '<th>Ανάδοχος</th>'+
-            '<th style="width:70px;text-align:center">Πρόοδος</th>'+
-            '<th style="width:120px;text-align:center">Προθεσμία</th>'+
+            '<th style="width:32px">Α/Α</th>'+
+            '<th style="width:18%">Τίτλος Έργου</th>'+
+            '<th style="width:100px">Πρόγραμμα</th>'+
+            '<th style="width:13%">Ανάδοχος</th>'+
+            '<th style="width:58px;text-align:center">Πρόοδος</th>'+
+            '<th style="width:20%">Κατάσταση</th>'+
+            '<th>Κρίσιμα Θέματα &amp; Ενέργειες</th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
     '</table>'+
