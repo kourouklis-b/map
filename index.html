@@ -559,7 +559,7 @@ function buildPopup(props, color) {
     var h = '<div class="pu-inner">';
     h += '<button class="pu-close" onclick="doClose()">✕</button>';
     h += '<div class="pu-id-row">α/α-' + props.id + (mis ? ' · MIS: ' + mis : '') + '</div>';
-    h += '<div class="pu-title">' + ((props.title||'').trim()) + '</div>';
+    h += '<div class="pu-title">' + ((props.title||'').trim().toUpperCase()) + '</div>';
     if (props.fund_prog) h += '<span class="pu-prog" style="background:' + color + '">' + props.fund_prog.trim() + '</span>';
     if (props['descr/tion']) {
         h += '<div class="pu-grid single"><div class="pu-box full"><label>Αντικείμενο</label><p>' + props['descr/tion'].trim() + '</p></div></div>';
@@ -659,7 +659,7 @@ function buildSidebar(filter) {
         item.innerHTML =
             '<div class="proj-num" style="color:'+color+';border-color:'+color+'55;background:'+color+'15">'+p.id+'</div>'+
             '<div class="proj-body">'+
-                '<div class="proj-title">'+((p.title||'').trim())+'</div>'+
+                '<div class="proj-title">'+((p.title||'').trim().toUpperCase())+'</div>'+
                 '<div class="proj-meta">'+
                     '<span class="proj-tag" style="background:'+color+'18;color:'+color+';border:1px solid '+color+'40">'+LABELS[cls]+'</span>'+
                     (pct!==null ? '<span class="proj-pct">'+pct.toFixed(0)+'%</span>' : '')+
@@ -763,7 +763,7 @@ function doExportPDF(){
             : '<span style="color:#94a3b8">—</span>';
         return '<tr>'+
             '<td style="text-align:center;font-weight:700;color:'+col+'">'+p.id+'</td>'+
-            '<td style="font-weight:600">'+((p.title||'').trim())+'</td>'+
+            '<td style="font-weight:600">'+((p.title||'').trim().toUpperCase())+'</td>'+
             '<td><span style="background:'+col+'22;color:'+col+';border:1px solid '+col+'55;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap">'+prog+'</span></td>'+
             '<td>'+(p.contractor||'—').trim()+'</td>'+
             '<td style="text-align:center">'+pctBadge(pct)+'</td>'+
@@ -938,7 +938,7 @@ function doExportPDF(){
             var rgb=PROG_RGB[cls]||PROG_RGB.other;
             var pct=getPct(p.status);
             sf('normal',7,[30,42,95]);
-            var tlines=doc.splitTextToSize((p.title||'').trim(),cols[1].w-2);
+            var tlines=doc.splitTextToSize((p.title||'').trim().toUpperCase(),cols[1].w-2);
             var rh=Math.max(7,tlines.length*3.2+3);
 
             if(ty+rh>H-14){
