@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<title>Excel → detail_data.js | ΕΔΥΜΕΤ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f0f4f8;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 16px}
+.card{background:#fff;border-radius:14px;box-shadow:0 4px 24px rgba(30,58,95,.10);padding:36px 40px;max-width:700px;width:100%}
+h1{font-size:20px;color:#1E3A5F;font-weight:700;margin-bottom:4px}
+.sub{font-size:12px;color:#64748b;margin-bottom:24px}
+.how{background:#f0f7ff;border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:12.5px;color:#334155;line-height:1.8}
+.how strong{color:#1E3A5F}
+.drop-zone{border:2.5px dashed #2E75B6;border-radius:10px;padding:32px;text-align:center;cursor:pointer;background:#f7fbff;transition:.2s;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.drag{background:#e8f2fc;border-color:#1E3A5F}
+.drop-zone p{color:#1E3A5F;font-weight:600;font-size:14px;margin-top:8px}
+.drop-zone small{color:#94a3b8;font-size:12px}
+input[type=file]{display:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#1E3A5F;color:#fff;border:none;border-radius:8px;padding:13px 26px;font-size:14px;font-weight:700;cursor:pointer;width:100%;transition:.2s}
+.btn:hover{background:#2E75B6}
+.btn:disabled{background:#94a3b8;cursor:not-allowed}
+.status{margin-top:14px;padding:12px 16px;border-radius:8px;font-size:13px;display:none}
+.status.ok{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.status.err{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.status.info{background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd}
+.preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;font-size:11px;max-height:220px;overflow-y:auto;margin-top:12px;display:none}
+.preview table{width:100%;border-collapse:collapse}
+.preview th{background:#1E3A5F;color:#fff;padding:4px 8px;font-size:10.5px;text-align:left}
+.preview td{padding:3px 8px;border-bottom:1px solid #e2e8f0;font-size:10.5px;vertical-align:top;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preview tr:nth-child(even) td{background:#f0f5fb}
+.badge{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;color:#fff;margin-left:4px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📊 Excel → detail_data.js</h1>
+  <div class="sub">Μετατροπέας δεδομένων για τον χάρτη ΕΔΥΜΕΤ</div>
+
+  <div class="how">
+    <strong>Οδηγίες:</strong><br>
+    1. Ανέβασε το Excel με τα δεδομένα (tabs: ΕΠ ΥΜΕΠΕΡΑΑ, ΜΕΤΑΦΟΡΕΣ, CEF 14 20, CEF 21 27, ΠεΠ 2021-2027)<br>
+    2. Κατέβασε το <strong>detail_data.js</strong><br>
+    3. Αντέγραψε το αρχείο στον φάκελο <strong>data/</strong> του χάρτη (αντικατάσταση παλιού)
+  </div>
+
+  <div class="drop-zone" id="dropZone">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="#2E75B6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+    <p>Σύρε το Excel εδώ ή κάνε κλικ</p>
+    <small>.xlsx αρχείο</small>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+
+  <div class="preview" id="preview"></div>
+
+  <button class="btn" id="convertBtn" disabled>⬇ Κατέβασε detail_data.js</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+// Column config per sheet
+var SHEETS = {
+  'ΕΠ ΥΜΕΠΕΡΑΑ':  { hdr:0, id:0, mis:2, title:3, net:4, contractor:5, budg:6, deadline:10, stat_short:11, status:12, crit:13 },
+  'ΜΕΤΑΦΟΡΕΣ':    { hdr:4, id:0, mis:2, title:3, net:4, contractor:5, budg:7, deadline:11, stat_short:12, descr:13, status:14, crit:15 },
+  'CEF 14 20':    { hdr:4, id:0, mis:2, title:3, net:4, contractor:5, budg:6, deadline:8,  stat_short:11, status:13, crit:14 },
+  'CEF 21 27':    { hdr:4, id:0, mis:2, title:3, net:4, contractor:5, budg:6, deadline:8,  stat_short:11, status:14, crit:15 },
+  'ΠεΠ 2021-2027':{ hdr:4, id:0, mis:2, title:3, net:4, contractor:5, budg:6, deadline:10, stat_short:11, status:13, crit:14 }
+};
+
+var PROG_COLORS = {
+  'ΕΠ ΥΜΕΠΕΡΑΑ':'#0ea5e9','ΜΕΤΑΦΟΡΕΣ':'#22c55e','CEF 14 20':'#a855f7','CEF 21 27':'#f97316','ΠεΠ 2021-2027':'#6b7280'
+};
+
+var dropZone = document.getElementById('dropZone');
+var fileInput = document.getElementById('fileInput');
+var convertBtn = document.getElementById('convertBtn');
+var statusEl = document.getElementById('status');
+var previewEl = document.getElementById('preview');
+var parsedData = null;
+
+dropZone.addEventListener('click', function(){ fileInput.click(); });
+dropZone.addEventListener('dragover', function(e){ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', function(){ dropZone.classList.remove('drag'); });
+dropZone.addEventListener('drop', function(e){ e.preventDefault(); dropZone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', function(e){ handleFile(e.target.files[0]); });
+
+function showStatus(msg,type){ statusEl.textContent=msg; statusEl.className='status '+type; statusEl.style.display='block'; }
+
+function fmtVal(v) {
+    if (v === null || v === undefined) return '';
+    if (v instanceof Date) {
+        var d = v.getDate(), m = v.getMonth()+1, y = v.getFullYear();
+        return (d<10?'0':'')+d+'.'+(m<10?'0':'')+m+'.'+y;
+    }
+    if (typeof v === 'number') {
+        if (Number.isInteger(v)) return String(v);
+        return v.toLocaleString('el-GR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+    }
+    return String(v).trim();
+}
+
+function handleFile(file) {
+    if (!file) return;
+    showStatus('Φόρτωση...','info');
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+            parsedData = {};
+            var totalRows = 0;
+            
+            wb.SheetNames.forEach(function(sheetName) {
+                // Find matching config (fuzzy match)
+                var cfg = null;
+                var cfgKey = null;
+                Object.keys(SHEETS).forEach(function(k) {
+                    if (sheetName.indexOf(k.replace(' ','')) >= 0 || k.indexOf(sheetName.substring(0,6)) >= 0 || sheetName === k) {
+                        cfg = SHEETS[k]; cfgKey = k;
+                    }
+                });
+                if (!cfg) {
+                    // Try partial match
+                    var sn = sheetName.toUpperCase();
+                    if (sn.includes('ΥΜΕΠ')) { cfg = SHEETS['ΕΠ ΥΜΕΠΕΡΑΑ']; cfgKey='ΕΠ ΥΜΕΠΕΡΑΑ'; }
+                    else if (sn.includes('ΜΕΤΑΦ')) { cfg = SHEETS['ΜΕΤΑΦΟΡΕΣ']; cfgKey='ΜΕΤΑΦΟΡΕΣ'; }
+                    else if (sn.includes('14')) { cfg = SHEETS['CEF 14 20']; cfgKey='CEF 14 20'; }
+                    else if (sn.includes('21')) { cfg = SHEETS['CEF 21 27']; cfgKey='CEF 21 27'; }
+                    else if (sn.includes('ΠΕΠ') || sn.includes('ΠεΠ')) { cfg = SHEETS['ΠεΠ 2021-2027']; cfgKey='ΠεΠ 2021-2027'; }
+                }
+                if (!cfg) return;
+                
+                var ws = wb.Sheets[sheetName];
+                var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false, dateNF:'DD.MM.YYYY'});
+                
+                for (var i = cfg.hdr+1; i < rows.length; i++) {
+                    var row = rows[i];
+                    var rawId = row[cfg.id];
+                    if (!rawId) continue;
+                    var pid = String(rawId).split('\n')[0].trim();
+                    if (isNaN(parseInt(pid))) continue;
+                    pid = String(parseInt(pid));
+                    
+                    function gc(key) {
+                        var idx = cfg[key];
+                        if (idx === undefined || idx >= row.length) return '';
+                        return String(row[idx]||'').trim();
+                    }
+                    
+                    var budgRaw = row[cfg.budg];
+                    var budg = '';
+                    if (budgRaw && !isNaN(parseFloat(String(budgRaw).replace(',','.')))) {
+                        budg = parseFloat(String(budgRaw).replace(',','.')).toLocaleString('el-GR',{maximumFractionDigits:0}) + ' €';
+                    } else if (budgRaw) {
+                        budg = String(budgRaw).trim();
+                    }
+                    
+                    parsedData[pid] = {
+                        sheet:      cfgKey,
+                        mis_code:   gc('mis'),
+                        title:      gc('title'),
+                        network:    gc('net'),
+                        contractor: gc('contractor'),
+                        budg_fund:  budg,
+                        deadline:   gc('deadline'),
+                        status_short: gc('stat_short'),
+                        descr:      cfg.descr !== undefined ? gc('descr') : '',
+                        status:     gc('status'),
+                        critical_i: gc('crit')
+                    };
+                    totalRows++;
+                }
+            });
+            
+            // Preview
+            var pids = Object.keys(parsedData).sort(function(a,b){return parseInt(a)-parseInt(b);});
+            var col = PROG_COLORS;
+            previewEl.style.display='block';
+            previewEl.innerHTML = '<p style="margin-bottom:8px;color:#1E3A5F;font-weight:700">✅ Βρέθηκαν <strong>'+pids.length+'</strong> έργα</p>' +
+                '<table><thead><tr><th>ID</th><th>Τίτλος</th><th>Πρόγραμμα</th><th>Φάση</th></tr></thead><tbody>' +
+                pids.slice(0,8).map(function(pid){
+                    var d = parsedData[pid];
+                    var c = col[d.sheet]||'#64748b';
+                    return '<tr><td><strong style="color:'+c+'">'+pid+'</strong></td>'+
+                        '<td style="max-width:220px">'+d.title.substring(0,60)+(d.title.length>60?'…':'')+'</td>'+
+                        '<td><span class="badge" style="background:'+c+'">'+d.sheet+'</span></td>'+
+                        '<td>'+d.status_short.substring(0,25)+'</td></tr>';
+                }).join('') +
+                (pids.length>8?'<tr><td colspan="4" style="color:#94a3b8;font-size:10px">...και '+(pids.length-8)+' ακόμη</td></tr>':'') +
+                '</tbody></table>';
+            
+            convertBtn.disabled = false;
+            showStatus('Φορτώθηκαν '+pids.length+' έργα από '+Object.keys(SHEETS).length+' tabs. Πάτα το κουμπί για να κατεβάσεις το JS.','ok');
+        } catch(err) {
+            showStatus('Σφάλμα: '+err.message,'err');
+            console.error(err);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+convertBtn.addEventListener('click', function() {
+    if (!parsedData) return;
+    var js = 'var DETAIL_DATA = ' + JSON.stringify(parsedData, null, 2) + ';\n';
+    var blob = new Blob([js], {type:'text/javascript'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'detail_data.js';
+    a.click();
+    showStatus('✅ Κατεβαίνει το detail_data.js. Βάλε το στον φάκελο data/ του χάρτη.','ok');
+});
+</script>
+</body>
+</html>
