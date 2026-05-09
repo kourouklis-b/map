@@ -970,6 +970,13 @@ function doExportPDF(){
         var col = COL_MAP[cls]||'#6b7280';
         var pct = getPct(p.status);
         var prog = (p.fund_prog||'').replace(/Πρόγραμμα «|»/g,'').trim();
+        // Get extra fields from DETAIL_DATA if available
+        var dd = (typeof DETAIL_DATA !== 'undefined') ? (DETAIL_DATA[String(p.id)]||null) : null;
+        var ddFields = dd ? (dd.fields||[]) : [];
+        function ddGet(key){ var f=ddFields.find(function(x){return x.key===key;}); return f?f.value:''; }
+        var contractA = ddGet('contract_a') || (p.contract_a||'');
+        var signDate  = ddGet('sign_date')  || (p.sign_date||'');
+        var deadline  = ddGet('deadline')   || (p.deadline||'');
         var statusTxt = (p.status||'—').trim().replace(/\n/g,'<br>');
         var criticalItems = (p.critical_i||'').trim().split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
         var criticalHtml = criticalItems.length
@@ -979,6 +986,9 @@ function doExportPDF(){
             '<td style="text-align:center;font-weight:700;color:'+col+'">'+p.id+'</td>'+
             '<td style="font-weight:600">'+((p.title||'').trim().toUpperCase())+'</td>'+
             '<td><span style="background:'+col+'22;color:'+col+';border:1px solid '+col+'55;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap">'+prog+'</span></td>'+
+            '<td style="font-size:10px;color:#334155">'+(contractA||'—')+'</td>'+
+            '<td style="font-size:10px;white-space:nowrap;color:#334155">'+(signDate||'—')+'</td>'+
+            '<td style="font-size:10px;white-space:nowrap;color:#334155">'+(deadline||'—')+'</td>'+
             '<td>'+(p.contractor||'—').trim()+'</td>'+
             '<td style="text-align:center">'+pctBadge(pct)+'</td>'+
             '<td style="font-size:10px;color:#334155">'+statusTxt+'</td>'+
@@ -992,7 +1002,7 @@ function doExportPDF(){
         '@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap");'+
         '*{box-sizing:border-box;margin:0;padding:0}'+
         'body{font-family:Barlow,Arial,sans-serif;font-size:12px;color:#1e293b;background:#fff}'+
-        '@page{size:A4 landscape;margin:12mm 14mm}'+
+        '@page{size:A4 landscape;margin:10mm 12mm}'+
         '.hdr{background:#1e3a5f;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border-radius:6px;margin-bottom:10px}'+
         '.hdr-left h1{font-size:20px;font-weight:700;letter-spacing:.5px}'+
         '.hdr-left p{font-size:11px;color:#8aafd4;margin-top:3px}'+
@@ -1030,12 +1040,15 @@ function doExportPDF(){
     '</div>'+
     '<table>'+
         '<thead><tr>'+
-            '<th style="width:32px">Α/Α</th>'+
-            '<th style="width:18%">Τίτλος Έργου</th>'+
-            '<th style="width:100px">Πρόγραμμα</th>'+
-            '<th style="width:13%">Ανάδοχος</th>'+
-            '<th style="width:58px;text-align:center">Πρόοδος</th>'+
-            '<th style="width:20%">Κατάσταση</th>'+
+            '<th style="width:28px">Α/Α</th>'+
+            '<th style="width:16%">Τίτλος Έργου</th>'+
+            '<th style="width:90px">Πρόγραμμα</th>'+
+            '<th style="width:9%">Ποσό Σύμβασης</th>'+
+            '<th style="width:72px">Ημ. Υπογραφής</th>'+
+            '<th style="width:80px">Προθεσμία</th>'+
+            '<th style="width:10%">Ανάδοχος</th>'+
+            '<th style="width:48px;text-align:center">Πρόοδος</th>'+
+            '<th style="width:17%">Κατάσταση</th>'+
             '<th>Κρίσιμα Θέματα &amp; Ενέργειες</th>'+
         '</tr></thead>'+
         '<tbody>'+rows+'</tbody>'+
